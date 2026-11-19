@@ -26,25 +26,31 @@ kotlin {
     }
 }
 
+val homeRelease = providers.gradleProperty("homeRelease").orNull == "true"
+
 android {
     namespace = "org.jellyfin.mobile"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
 
     defaultConfig {
+        if (homeRelease) applicationId = "cn.jiuwusan.jellyfin"
+        manifestPlaceholders["appLabel"] = if (homeRelease) "Jellyfin 家庭版" else "@string/app_name"
         buildConfigField("boolean", "HOME_PROXY_TRIAL", "false")
-        minSdk = libs.versions.android.minSdk.get().toInt()
+        val upstreamMinSdk = libs.versions.android.minSdk.get().toInt()
+        minSdk = if (homeRelease) maxOf(upstreamMinSdk, 23) else upstreamMinSdk
         targetSdk = libs.versions.android.targetSdk.get().toInt()
-        versionName = project.getVersionName()
+        versionName = if (homeRelease) project.getVersionName("2.7.3-home.1") else project.getVersionName()
         versionCode = getVersionCode(versionName!!)
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
     }
 
     signingConfigs {
-        val keystoreFile = getProperty("keystore.file")
-        val keystorePassword = getProperty("keystore.password")
-        val signingKeyAlias = getProperty("signing.key.alias")
-        val signingKeyPassword = getProperty("signing.key.password")
+        val signingPrefix = if (homeRelease) "home." else ""
+        val keystoreFile = getProperty("${signingPrefix}keystore.file")
+        val keystorePassword = getProperty("${signingPrefix}keystore.password")
+        val signingKeyAlias = getProperty("${signingPrefix}signing.key.alias")
+        val signingKeyPassword = getProperty("${signingPrefix}signing.key.password")
 
         if (keystoreFile != null && keystorePassword != null && signingKeyAlias != null && signingKeyPassword != null) {
             create("release") {
@@ -53,6 +59,8 @@ android {
                 keyAlias = signingKeyAlias
                 keyPassword = signingKeyPassword
             }
+        } else if (homeRelease) {
+            error("Home release requires HOME_KEYSTORE_FILE, HOME_KEYSTORE_PASSWORD, HOME_SIGNING_KEY_ALIAS and HOME_SIGNING_KEY_PASSWORD")
         }
     }
 
@@ -65,6 +73,7 @@ android {
         getByName("release") {
             isMinifyEnabled = true
             isShrinkResources = true
+            buildConfigField("boolean", "HOME_PROXY_TRIAL", homeRelease.toString())
 
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             signingConfig = signingConfigs.findByName("release")
