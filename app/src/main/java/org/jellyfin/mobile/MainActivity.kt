@@ -20,6 +20,7 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.content.pm.ShortcutInfoCompat
 import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.fragment.app.Fragment
+import androidx.fragment.app.FragmentManager
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.withStarted
 import kotlinx.coroutines.flow.collectLatest
@@ -31,6 +32,7 @@ import org.jellyfin.mobile.player.ui.PlayerFragment
 import org.jellyfin.mobile.proxy.HomeProxySettings
 import org.jellyfin.mobile.proxy.prompt
 import org.jellyfin.mobile.settings.HomeProxyFragment
+import org.jellyfin.mobile.settings.HomeAuthorizationFragment
 import org.jellyfin.mobile.setup.ConnectFragment
 import org.jellyfin.mobile.utils.AndroidVersion
 import org.jellyfin.mobile.utils.BackPressInterceptor
@@ -56,7 +58,7 @@ class MainActivity : AppCompatActivity() {
     private val permissionRequestHelper: PermissionRequestHelper by inject()
     private val homeProxy: HomeProxySettings by inject()
     private var playerServiceBound = false
-    private var openProxyOnResume = false
+    private var pendingHomeSettings: String? = null
 
     var serviceBinder: RemotePlayerService.ServiceBinder? = null
         private set
@@ -112,7 +114,7 @@ class MainActivity : AppCompatActivity() {
         )
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-        readHomeProxyShortcut(intent)
+        readHomeSettingsShortcut(intent)
 
         // Check WebView support
         if (!isWebViewSupported()) {
@@ -151,6 +153,13 @@ class MainActivity : AppCompatActivity() {
                     .setIntent(Intent(this, MainActivity::class.java).setAction(ACTION_HOME_PROXY))
                     .build(),
             )
+            ShortcutManagerCompat.pushDynamicShortcut(
+                this,
+                ShortcutInfoCompat.Builder(this, "home-authorization")
+                    .setShortLabel(getString(R.string.home_authorization_title))
+                    .setIntent(Intent(this, MainActivity::class.java).setAction(ACTION_HOME_AUTHORIZATION))
+                    .build(),
+            )
         }
 
         // Subscribe to activity events
@@ -159,12 +168,13 @@ class MainActivity : AppCompatActivity() {
         // Load UI
         lifecycleScope.launch {
             mainViewModel.serverState.collectLatest { state ->
-                if (homeProxy.enabled && state != ServerState.Pending && state.server?.hostname != HomeProxySettings.SERVER) {
-                    mainViewModel.switchServer(HomeProxySettings.SERVER)
+                val homeServer = homeProxy.server
+                if (homeProxy.enabled && state != ServerState.Pending && state.server?.hostname != homeServer) {
+                    mainViewModel.switchServer(homeServer, resetUserOnChange = true)
                 } else {
                     lifecycle.withStarted {
                         handleServerState(state)
-                        if (state is ServerState.Available) openHomeProxyShortcut()
+                        if (state is ServerState.Available) openHomeSettingsShortcut()
                     }
                 }
             }
@@ -180,26 +190,41 @@ class MainActivity : AppCompatActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        readHomeProxyShortcut(intent)
+        readHomeSettingsShortcut(intent)
     }
 
     override fun onPostResume() {
         super.onPostResume()
-        if (supportFragmentManager.fragments.any { it is WebViewFragment }) openHomeProxyShortcut()
+        if (supportFragmentManager.fragments.any { it is WebViewFragment }) {
+            openHomeSettingsShortcut()
+        }
     }
 
-    private fun readHomeProxyShortcut(intent: Intent) {
-        if (homeProxy.enabled && intent.action == ACTION_HOME_PROXY) {
-            openProxyOnResume = true
+    private fun readHomeSettingsShortcut(intent: Intent) {
+        if (homeProxy.enabled && intent.action in setOf(ACTION_HOME_PROXY, ACTION_HOME_AUTHORIZATION)) {
+            pendingHomeSettings = intent.action
             intent.action = Intent.ACTION_MAIN
         }
     }
 
-    private fun openHomeProxyShortcut() {
-        if (!openProxyOnResume || supportFragmentManager.isStateSaved) return
-        openProxyOnResume = false
-        if (supportFragmentManager.findFragmentById(R.id.fragment_container) !is HomeProxyFragment) {
+    private fun openHomeSettingsShortcut() {
+        val action = pendingHomeSettings ?: return
+        if (supportFragmentManager.isStateSaved) return
+        pendingHomeSettings = null
+        val current = supportFragmentManager.findFragmentById(R.id.fragment_container)
+        if (action == ACTION_HOME_AUTHORIZATION && current !is HomeAuthorizationFragment) {
+            supportFragmentManager.addFragment<HomeAuthorizationFragment>()
+        } else if (action == ACTION_HOME_PROXY && current !is HomeProxyFragment) {
             supportFragmentManager.addFragment<HomeProxyFragment>()
+        }
+    }
+
+    internal fun refreshHomeServer() {
+        val selected = mainViewModel.serverState.value.server ?: return
+        val homeServer = homeProxy.server
+        if (selected.hostname != homeServer) {
+            supportFragmentManager.popBackStack(null, FragmentManager.POP_BACK_STACK_INCLUSIVE)
+            lifecycleScope.launch { mainViewModel.switchServer(homeServer, resetUserOnChange = true) }
         }
     }
 
@@ -272,5 +297,6 @@ class MainActivity : AppCompatActivity() {
 
     companion object {
         private const val ACTION_HOME_PROXY = "org.jellyfin.mobile.action.HOME_PROXY_SETTINGS"
+        private const val ACTION_HOME_AUTHORIZATION = "org.jellyfin.mobile.action.HOME_AUTHORIZATION_SETTINGS"
     }
 }

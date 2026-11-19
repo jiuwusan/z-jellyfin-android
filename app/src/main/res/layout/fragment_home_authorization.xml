@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/theme_background"
+    android:orientation="vertical">
+
+    <androidx.appcompat.widget.Toolbar
+        android:id="@+id/toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:background="?colorPrimary" />
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="20dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                android:text="@string/home_authorization_message"
+                android:textColor="?android:textColorSecondary"
+                android:textSize="14sp" />
+
+            <TextView
+                style="@style/HomeProxyFieldLabel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:labelFor="@id/authorization_server"
+                android:text="@string/home_authorization_server" />
+
+            <EditText
+                android:id="@+id/authorization_server"
+                style="@style/HomeProxyInput"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:imeOptions="actionNext"
+                android:inputType="textUri" />
+
+            <TextView
+                style="@style/HomeProxyFieldLabel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:labelFor="@id/authorization_username"
+                android:text="@string/home_authorization_username" />
+
+            <EditText
+                android:id="@+id/authorization_username"
+                style="@style/HomeProxyInput"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:imeOptions="actionNext"
+                android:inputType="textNoSuggestions" />
+
+            <TextView
+                style="@style/HomeProxyFieldLabel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:labelFor="@id/authorization_password"
+                android:text="@string/home_authorization_password" />
+
+            <EditText
+                android:id="@+id/authorization_password"
+                style="@style/HomeProxyInput"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:imeOptions="actionDone"
+                android:inputType="textPassword"
+                android:importantForAutofill="no"
+                android:saveEnabled="false" />
+
+            <LinearLayout
+                android:id="@+id/authorization_confirmation_group"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <TextView
+                    style="@style/HomeProxyFieldLabel"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:labelFor="@id/authorization_confirmation"
+                    android:text="@string/home_proxy_change_password" />
+
+                <EditText
+                    android:id="@+id/authorization_confirmation"
+                    style="@style/HomeProxyInput"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:imeOptions="actionDone"
+                    android:inputType="textPassword"
+                    android:importantForAutofill="no"
+                    android:saveEnabled="false" />
+            </LinearLayout>
+
+            <Button
+                android:id="@+id/clear_authorization"
+                style="?android:attr/borderlessButtonStyle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="@string/home_authorization_clear"
+                android:textAllCaps="false"
+                android:visibility="gone" />
+        </LinearLayout>
+    </ScrollView>
+
+    <Button
+        android:id="@+id/save_profile"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="20dp"
+        android:layout_marginEnd="20dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginBottom="16dp"
+        android:background="@drawable/home_proxy_save_button"
+        android:minHeight="52dp"
+        android:text="@string/home_proxy_save"
+        android:textAllCaps="false"
+        android:textColor="@color/theme_background"
+        android:textSize="16sp"
+        android:textStyle="bold" />
+</LinearLayout>

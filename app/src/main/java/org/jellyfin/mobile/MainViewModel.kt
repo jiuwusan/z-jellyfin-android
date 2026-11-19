@@ -28,8 +28,8 @@ class MainViewModel(
         }
     }
 
-    suspend fun switchServer(hostname: String) {
-        apiClientController.setupServer(hostname)
+    suspend fun switchServer(hostname: String, resetUserOnChange: Boolean = false) {
+        apiClientController.setupServer(hostname, resetUserOnChange)
         refreshServer()
         refreshUser()
     }

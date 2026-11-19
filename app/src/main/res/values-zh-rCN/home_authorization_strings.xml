@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="home_authorization_title">授权</string>
+    <string name="home_authorization_summary">保存服务器和账号，自动登录</string>
+    <string name="home_authorization_message">保存 Jellyfin 登录信息后，打开 App 会自动连接并登录。</string>
+    <string name="home_authorization_server">服务器地址</string>
+    <string name="home_authorization_username">Jellyfin 账号</string>
+    <string name="home_authorization_password">Jellyfin 密码</string>
+    <string name="home_authorization_server_invalid">请输入以 http:// 开头的 Jellyfin 服务器地址</string>
+    <string name="home_authorization_username_required">请输入 Jellyfin 账号</string>
+    <string name="home_authorization_password_required">请输入 Jellyfin 密码</string>
+    <string name="home_authorization_saved">授权已保存</string>
+    <string name="home_authorization_save_failed">这台手机无法保存授权信息</string>
+    <string name="home_authorization_rejected">自动登录未通过，请在「授权」中检查账号和密码。</string>
+    <string name="home_authorization_clear">清除授权</string>
+    <string name="home_authorization_clear_message">清除已保存的登录信息并关闭自动登录？</string>
+</resources>

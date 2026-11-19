@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="home_authorization_title">Authorization</string>
+    <string name="home_authorization_summary">Save the server and sign in automatically</string>
+    <string name="home_authorization_message">Save your Jellyfin login for automatic connection and sign-in when you open the app.</string>
+    <string name="home_authorization_server">Server address</string>
+    <string name="home_authorization_username">Jellyfin username</string>
+    <string name="home_authorization_password">Jellyfin password</string>
+    <string name="home_authorization_server_invalid">Enter a Jellyfin server address starting with http://</string>
+    <string name="home_authorization_username_required">Enter your Jellyfin username</string>
+    <string name="home_authorization_password_required">Enter your Jellyfin password</string>
+    <string name="home_authorization_saved">Authorization saved</string>
+    <string name="home_authorization_save_failed">Could not save authorization on this phone</string>
+    <string name="home_authorization_rejected">Automatic sign-in was declined. Check your credentials in Authorization.</string>
+    <string name="home_authorization_clear">Clear authorization</string>
+    <string name="home_authorization_clear_message">Clear the saved credentials and turn off automatic sign-in?</string>
+</resources>

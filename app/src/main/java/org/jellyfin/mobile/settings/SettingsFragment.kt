@@ -105,6 +105,14 @@ class SettingsFragment : Fragment(), BackPressInterceptor {
                     true
                 }
             }
+            pref("pref_home_authorization") {
+                titleRes = R.string.home_authorization_title
+                summaryRes = R.string.home_authorization_summary
+                onClick {
+                    parentFragmentManager.addFragment<HomeAuthorizationFragment>()
+                    true
+                }
+            }
         }
         categoryHeader(PREF_CATEGORY_MUSIC_PLAYER) {
             titleRes = R.string.pref_category_music_player

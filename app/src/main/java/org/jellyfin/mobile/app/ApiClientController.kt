@@ -25,11 +25,18 @@ class ApiClientController(
     /**
      * Store server with [hostname] in the database.
      */
-    suspend fun setupServer(hostname: String) {
-        appPreferences.currentServerId = withContext(Dispatchers.IO) {
+    suspend fun setupServer(hostname: String, resetUserOnChange: Boolean = false) {
+        val serverId = withContext(Dispatchers.IO) {
             serverDao.getServerByHostname(hostname)?.id ?: serverDao.insert(hostname)
         }
+        if (resetUserOnChange && serverId != appPreferences.currentServerId) clearUser()
+        appPreferences.currentServerId = serverId
         apiClient.update(baseUrl = hostname)
+    }
+
+    private fun clearUser() {
+        appPreferences.currentUserId = null
+        resetApiClientUser()
     }
 
     suspend fun setupUser(serverId: Long, userId: UUID, accessToken: String) {

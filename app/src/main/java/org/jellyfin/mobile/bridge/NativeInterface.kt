@@ -16,6 +16,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
 import org.jellyfin.mobile.BuildConfig
+import org.jellyfin.mobile.authorization.HomeAuthorizationSettings
 import org.jellyfin.mobile.events.ActivityEvent
 import org.jellyfin.mobile.events.ActivityEventHandler
 import org.jellyfin.mobile.player.deviceprofile.DeviceProfileBuilder
@@ -34,6 +35,7 @@ import org.jellyfin.mobile.utils.Constants.EXTRA_TITLE
 import org.jellyfin.mobile.webapp.RemotePlayerService
 import org.jellyfin.mobile.webapp.RemoteVolumeProvider
 import org.jellyfin.sdk.api.client.ApiClient
+import org.jellyfin.sdk.Jellyfin
 import org.jellyfin.sdk.api.client.util.AuthorizationHeaderBuilder
 import org.jellyfin.sdk.model.serializer.toUUID
 import org.json.JSONArray
@@ -53,7 +55,11 @@ class NativeInterface(private val context: Context) : KoinComponent {
     @JavascriptInterface
     fun getDeviceInformation(): String? = try {
         val apiClient: ApiClient = get()
-        val deviceInfo = apiClient.deviceInfo
+        val deviceInfo = if (get<HomeAuthorizationSettings>().profile != null) {
+            get<Jellyfin>().options.deviceInfo ?: apiClient.deviceInfo
+        } else {
+            apiClient.deviceInfo
+        }
         val clientInfo = apiClient.clientInfo
 
         buildJsonObject {

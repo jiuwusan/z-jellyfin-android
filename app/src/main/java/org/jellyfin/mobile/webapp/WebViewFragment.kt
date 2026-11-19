@@ -10,6 +10,8 @@ import android.view.View
 import android.view.ViewGroup
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient.FileChooserParams
+import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.widget.Toast
 import androidx.activity.result.ActivityResultLauncher
@@ -22,11 +24,18 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.webkit.WebViewAssetLoader.AssetsPathHandler
 import androidx.webkit.WebViewCompat
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.first
+import kotlinx.serialization.json.Json
 import org.jellyfin.mobile.MainViewModel
 import org.jellyfin.mobile.R
 import org.jellyfin.mobile.app.AppPreferences
+import org.jellyfin.mobile.authorization.HomeAuthorizationClient
+import org.jellyfin.mobile.authorization.HomeAuthorizationProfile
+import org.jellyfin.mobile.authorization.HomeAuthorizationSettings
+import org.jellyfin.mobile.authorization.HomeWebSession
 import org.jellyfin.mobile.bridge.ExternalPlayer
 import org.jellyfin.mobile.bridge.MediaSegments
 import org.jellyfin.mobile.bridge.NativeInterface
@@ -50,6 +59,9 @@ import org.jellyfin.mobile.utils.requestNoBatteryOptimizations
 import org.jellyfin.mobile.utils.runOnUiThread
 import org.koin.android.ext.android.inject
 import org.koin.androidx.viewmodel.ext.android.activityViewModel
+import org.jellyfin.sdk.model.serializer.toUUID
+import java.util.UUID
+import kotlin.coroutines.resume
 
 class WebViewFragment : Fragment(), BackPressInterceptor, JellyfinWebChromeClient.FileChooserListener {
     val appPreferences: AppPreferences by inject()
@@ -61,7 +73,12 @@ class WebViewFragment : Fragment(), BackPressInterceptor, JellyfinWebChromeClien
     private lateinit var externalPlayer: ExternalPlayer
     private val mediaSegments: MediaSegments by inject()
     private val homeProxy: HomeProxySettings by inject()
+    private val authorization: HomeAuthorizationSettings by inject()
+    private val authorizationClient: HomeAuthorizationClient by inject()
     private var proxyErrorDialog: AlertDialog? = null
+    private var authorizationJob: Job? = null
+    private var bootstrapUrl: String? = null
+    private var clearBootstrapHistory = false
 
     lateinit var server: ServerEntity
         private set
@@ -97,6 +114,27 @@ class WebViewFragment : Fragment(), BackPressInterceptor, JellyfinWebChromeClien
             assetsPathHandler,
             mainViewModel,
         ) {
+            override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
+                if (request.isForMainFrame && request.method == "GET" && request.url.toString() == bootstrapUrl) {
+                    val page = "<!doctype html><meta name=\"color-scheme\" content=\"dark\"><title>Jellyfin</title>"
+                    return WebResourceResponse("text/html", "UTF-8", page.byteInputStream())
+                }
+                return super.shouldInterceptRequest(view, request)
+            }
+
+            override fun onPageFinished(view: WebView, url: String) {
+                super.onPageFinished(view, url)
+                if (webViewBinding?.webView !== view || view.url != url) return
+                if (url == bootstrapUrl) {
+                    val profile = authorization.profile?.takeIf { it.server == server.hostname }
+                    if (profile == null) view.loadServerPage() else checkAuthorization(view, profile, atStartup = true)
+                } else if (clearBootstrapHistory && isServerPage(url)) {
+                    clearBootstrapHistory = false
+                    bootstrapUrl = null
+                    view.clearHistory()
+                }
+            }
+
             override fun onConnectedToWebapp() {
                 val webViewBinding = webViewBinding ?: return
                 val webView = webViewBinding.webView
@@ -179,9 +217,19 @@ class WebViewFragment : Fragment(), BackPressInterceptor, JellyfinWebChromeClien
         return connected && webappFunctionChannel.goBack()
     }
 
+    override fun onResume() {
+        super.onResume()
+        val webView = webViewBinding?.webView ?: return
+        val profile = authorization.profile?.takeIf { it.server == server.hostname } ?: return
+        if (connected && isServerPage(webView.url)) checkAuthorization(webView, profile, atStartup = false)
+    }
+
     override fun onDestroyView() {
         proxyErrorDialog?.dismiss()
         proxyErrorDialog = null
+        connected = false
+        bootstrapUrl = null
+        clearBootstrapHistory = false
         super.onDestroyView()
         webViewBinding = null
     }
@@ -205,13 +253,74 @@ class WebViewFragment : Fragment(), BackPressInterceptor, JellyfinWebChromeClien
                     showProxyError()
                     return@configureWebView
                 }
-                loadUrl("${server.hostname.trimEnd('/')}/")
-                postDelayed(timeoutRunnable, Constants.INITIAL_CONNECTION_TIMEOUT)
-                postDelayed(showLoadingContainerRunnable, Constants.SHOW_PROGRESS_BAR_DELAY)
+                if (authorization.profile?.server == server.hostname) {
+                    val url = "${server.hostname}/.jellyfin-app-login-${UUID.randomUUID()}"
+                    bootstrapUrl = url
+                    clearBootstrapHistory = true
+                    postDelayed(showLoadingContainerRunnable, Constants.SHOW_PROGRESS_BAR_DELAY)
+                    loadUrl(url)
+                } else {
+                    loadServerPage()
+                }
             }
         ) {
             showProxyError(unsupportedWebView = true)
         }
+    }
+
+    private fun checkAuthorization(webView: WebView, profile: HomeAuthorizationProfile, atStartup: Boolean) {
+        if (authorizationJob?.isActive == true) return
+        authorizationJob = viewLifecycleOwner.lifecycleScope.launch {
+            val currentUrl = webView.url
+            val raw = webView.readJavascript("localStorage.getItem('jellyfin_credentials')")
+            val credentials = runCatching { Json.decodeFromString<String?>(raw.orEmpty()) }.getOrNull()
+            val result = authorizationClient.restore(profile, HomeWebSession.parse(credentials))
+            if (webViewBinding?.webView !== webView || webView.url != currentUrl) return@launch
+            if (authorization.profile !== profile) {
+                if (atStartup) webView.loadServerPage()
+                return@launch
+            }
+            val restored = if (result is HomeAuthorizationClient.Result.Restored) {
+                val expectedUrl = Json.encodeToString(currentUrl)
+                val serializedCredentials = Json.encodeToString(result.credentials)
+                val written = webView.readJavascript(
+                    """
+                    (() => {
+                        if (location.href !== $expectedUrl) return false;
+                        localStorage.setItem('jellyfin_credentials', $serializedCredentials);
+                        return true;
+                    })()
+                    """.trimIndent(),
+                ) == "true"
+                if (written) {
+                    mainViewModel.setupUser(server.id, result.session.userId.toUUID(), result.session.token)
+                }
+                written
+            } else {
+                if (result == HomeAuthorizationClient.Result.Rejected) {
+                    Toast.makeText(requireContext(), R.string.home_authorization_rejected, Toast.LENGTH_LONG).show()
+                }
+                false
+            }
+            if (atStartup || restored) webView.loadServerPage()
+        }
+    }
+
+    private fun isServerPage(url: String?): Boolean {
+        val prefix = "${server.hostname.trimEnd('/')}/"
+        return url?.startsWith(prefix) == true
+    }
+
+    private suspend fun WebView.readJavascript(script: String): String? = suspendCancellableCoroutine { continuation ->
+        evaluateJavascript(script) { if (continuation.isActive) continuation.resume(it) }
+    }
+
+    private fun WebView.loadServerPage() {
+        loadUrl("${server.hostname.trimEnd('/')}/")
+        removeCallbacks(timeoutRunnable)
+        removeCallbacks(showLoadingContainerRunnable)
+        postDelayed(timeoutRunnable, Constants.INITIAL_CONNECTION_TIMEOUT)
+        postDelayed(showLoadingContainerRunnable, Constants.SHOW_PROGRESS_BAR_DELAY)
     }
 
     private fun showOutdatedWebViewDialog(webView: WebView) {

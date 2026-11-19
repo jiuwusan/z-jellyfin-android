@@ -43,6 +43,8 @@ import org.jellyfin.mobile.player.qualityoptions.QualityOptionsProvider
 import org.jellyfin.mobile.player.source.MediaSourceResolver
 import org.jellyfin.mobile.player.ui.PlayerFragment
 import org.jellyfin.mobile.proxy.HomeProxySettings
+import org.jellyfin.mobile.authorization.HomeAuthorizationSettings
+import org.jellyfin.mobile.authorization.HomeAuthorizationClient
 import org.jellyfin.mobile.setup.ConnectionHelper
 import org.jellyfin.mobile.utils.Constants
 import org.jellyfin.mobile.utils.PermissionRequestHelper
@@ -65,8 +67,10 @@ private const val TS_SEARCH_PACKETS = 1800
 
 val applicationModule = module {
     single { AppPreferences(androidApplication()) }
-    single { HomeProxySettings(androidApplication()) }
+    single { HomeAuthorizationSettings(androidApplication()) }
+    single { HomeProxySettings(androidApplication(), get()) }
     single { get<HomeProxySettings>().configureClient(OkHttpClient.Builder()).build() }
+    single { HomeAuthorizationClient(get(), get(), get(), get()) }
     single {
         if (!get<HomeProxySettings>().enabled) ImageLoader(androidApplication())
         else {

@@ -20,9 +20,11 @@ import kotlin.concurrent.thread
 
 /** A process-local relay for one permitted HTTP origin. Raw responses preserve Range and HLS. */
 internal class HomeHttpProxy(
-    private val originAuthority: String,
+    private val allowedAuthority: () -> String,
     private val clientKey: String,
 ) : Closeable {
+    constructor(originAuthority: String, clientKey: String) : this({ originAuthority }, clientKey)
+
     @Volatile var profile: HomeProxyProfile? = null
     private val listener = ServerSocket().apply { bind(InetSocketAddress("127.0.0.1", 0), 32) }
     val port: Int = listener.localPort
@@ -73,10 +75,16 @@ internal class HomeHttpProxy(
         val input = BufferedInputStream(client.getInputStream())
         val output = client.getOutputStream()
         val initial = readRequest(input) ?: return output.error(400, "Invalid HTTP request")
+        val configuredAuthority = allowedAuthority()
+        val originAuthority = configuredAuthority.removeSuffix(":80")
+        val connectAuthority = if (URI("http://$originAuthority").port == -1) "$originAuthority:80" else originAuthority
+        fun permittedAuthority(value: String?): Boolean =
+            originAuthority.equals(value, ignoreCase = true) || connectAuthority.equals(value, ignoreCase = true)
+
         val connect = initial.method == "CONNECT"
         val upstream = profile ?: return output.error(503, "Home proxy setup required")
         val request = if (connect) {
-            if (initial.target != originAuthority) return output.error(403, "Destination is outside the home media server")
+            if (!permittedAuthority(initial.target)) return output.error(403, "Destination is outside the home media server")
             if (initial.headers.keys.any { it == "transfer-encoding" || it == "content-length" }) {
                 return output.error(400, "Invalid CONNECT framing")
             }
@@ -89,10 +97,10 @@ internal class HomeHttpProxy(
         val permitted = if (connect) {
             request.method == "GET" && target != null && target.rawPath.startsWith("/") && !target.isAbsolute &&
                 target.rawAuthority == null && target.rawFragment == null &&
-                request.headers["host"]?.singleOrNull()?.second == originAuthority
+                permittedAuthority(request.headers["host"]?.singleOrNull()?.second)
         } else {
             target != null && target.scheme in setOf("http", "ws") &&
-                target.rawAuthority == originAuthority && target.rawFragment == null
+                permittedAuthority(target.rawAuthority) && target.rawFragment == null
         }
         if (!permitted) return output.error(403, "Destination is outside the home media server")
         val cookies = request.headers["cookie"].orEmpty().flatMap { it.second.split(';').map(String::trim) }
@@ -125,7 +133,7 @@ internal class HomeHttpProxy(
             val remoteInput = BufferedInputStream(remote.getInputStream())
             if (upgrade) {
                 remoteOutput.write(
-                    ("CONNECT $originAuthority HTTP/1.1\r\nHost: $originAuthority\r\n" +
+                    ("CONNECT $connectAuthority HTTP/1.1\r\nHost: $connectAuthority\r\n" +
                         "Proxy-Authorization: Basic $authorization\r\n\r\n").toByteArray(Charsets.ISO_8859_1),
                 )
                 val tunnel = readHeaders(remoteInput)
