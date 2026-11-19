@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="home_proxy_setup">Set up home access</string>
+    <string name="home_proxy_setup_message">Set the HTTP proxy used to reach your home Jellyfin server. The app connects automatically on future launches.</string>
+    <string name="home_proxy_title">Proxy</string>
+    <string name="home_proxy_keep_password_help">Leave blank to keep the saved proxy password.</string>
+    <string name="home_proxy_settings_summary">Change the HTTP proxy address and credentials</string>
+    <string name="home_proxy_host">Proxy address</string>
+    <string name="home_proxy_port">Port</string>
+    <string name="home_proxy_username">Username</string>
+    <string name="home_proxy_password">Proxy password</string>
+    <string name="home_proxy_password_required">Enter the proxy password</string>
+    <string name="home_proxy_change_password">Settings confirmation password</string>
+    <string name="home_proxy_change_password_required">Enter the settings confirmation password</string>
+    <string name="home_proxy_change_password_incorrect">The settings confirmation password is incorrect</string>
+    <string name="home_proxy_password_mask" translatable="false">********</string>
+    <string name="home_proxy_invalid_host">Enter a hostname or IP address without a scheme or port</string>
+    <string name="home_proxy_invalid_port">Enter a port between 1 and 65535</string>
+    <string name="home_proxy_invalid_username">Enter a username without a colon</string>
+    <string name="home_proxy_save_failed">Could not save the proxy settings on this phone</string>
+    <string name="home_proxy_save">Save</string>
+    <string name="home_proxy_saved">Proxy settings saved</string>
+    <string name="home_proxy_back">Back</string>
+    <string name="home_proxy_unavailable">Could not connect to Jellyfin</string>
+    <string name="home_proxy_retry_message">Check your network connection and try again.</string>
+    <string name="home_proxy_update_webview">Update Android System WebView to use home access.</string>
+    <string name="home_proxy_retry">Retry</string>
+</resources>

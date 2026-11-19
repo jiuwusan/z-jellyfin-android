@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            android:text="@string/home_proxy_setup_message"
+            android:textColor="?android:textColorSecondary"
+            android:textSize="14sp" />
+
+        <TextView
+            style="@style/HomeProxyFieldLabel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:labelFor="@id/proxy_host"
+            android:text="@string/home_proxy_host" />
+
+        <EditText
+            android:id="@+id/proxy_host"
+            style="@style/HomeProxyInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:imeOptions="actionNext"
+            android:inputType="textUri" />
+
+        <TextView
+            style="@style/HomeProxyFieldLabel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:labelFor="@id/proxy_port"
+            android:text="@string/home_proxy_port" />
+
+        <EditText
+            android:id="@+id/proxy_port"
+            style="@style/HomeProxyInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:imeOptions="actionNext"
+            android:inputType="number" />
+
+        <TextView
+            style="@style/HomeProxyFieldLabel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:labelFor="@id/proxy_username"
+            android:text="@string/home_proxy_username" />
+
+        <EditText
+            android:id="@+id/proxy_username"
+            style="@style/HomeProxyInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:imeOptions="actionNext"
+            android:inputType="textNoSuggestions" />
+
+        <TextView
+            style="@style/HomeProxyFieldLabel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:labelFor="@id/proxy_password"
+            android:text="@string/home_proxy_password" />
+
+        <EditText
+            android:id="@+id/proxy_password"
+            style="@style/HomeProxyInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:imeOptions="actionDone"
+            android:inputType="textPassword"
+            android:importantForAutofill="no"
+            android:saveEnabled="false" />
+
+        <TextView
+            android:id="@+id/proxy_keep_password_help"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/home_proxy_keep_password_help"
+            android:textColor="?android:textColorSecondary"
+            android:textSize="13sp"
+            android:visibility="gone" />
+
+        <LinearLayout
+            android:id="@+id/proxy_change_password_group"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <TextView
+                style="@style/HomeProxyFieldLabel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:labelFor="@id/proxy_change_password"
+                android:text="@string/home_proxy_change_password" />
+
+            <EditText
+                android:id="@+id/proxy_change_password"
+                style="@style/HomeProxyInput"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:imeOptions="actionDone"
+                android:inputType="textPassword"
+                android:importantForAutofill="no"
+                android:saveEnabled="false" />
+        </LinearLayout>
+    </LinearLayout>
+</ScrollView>

@@ -23,6 +23,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.webkit.WebViewAssetLoader.AssetsPathHandler
 import androidx.webkit.WebViewCompat
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.first
 import org.jellyfin.mobile.MainViewModel
 import org.jellyfin.mobile.R
 import org.jellyfin.mobile.app.AppPreferences
@@ -32,6 +33,7 @@ import org.jellyfin.mobile.bridge.NativeInterface
 import org.jellyfin.mobile.bridge.NativePlayer
 import org.jellyfin.mobile.data.entity.ServerEntity
 import org.jellyfin.mobile.databinding.FragmentWebviewBinding
+import org.jellyfin.mobile.proxy.HomeProxySettings
 import org.jellyfin.mobile.setup.ConnectFragment
 import org.jellyfin.mobile.utils.AndroidVersion
 import org.jellyfin.mobile.utils.BackPressInterceptor
@@ -58,6 +60,8 @@ class WebViewFragment : Fragment(), BackPressInterceptor, JellyfinWebChromeClien
     private val nativePlayer: NativePlayer by inject()
     private lateinit var externalPlayer: ExternalPlayer
     private val mediaSegments: MediaSegments by inject()
+    private val homeProxy: HomeProxySettings by inject()
+    private var proxyErrorDialog: AlertDialog? = null
 
     lateinit var server: ServerEntity
         private set
@@ -151,7 +155,10 @@ class WebViewFragment : Fragment(), BackPressInterceptor, JellyfinWebChromeClien
         }
 
         // Setup WebView
-        webView.initialize()
+        viewLifecycleOwner.lifecycleScope.launch {
+            if (homeProxy.enabled) homeProxy.readiness.first { it }
+            webView.initialize()
+        }
 
         webViewBinding!!.useDifferentServerButton.setOnClickListener {
             webView.removeCallbacks(timeoutRunnable)
@@ -173,6 +180,8 @@ class WebViewFragment : Fragment(), BackPressInterceptor, JellyfinWebChromeClien
     }
 
     override fun onDestroyView() {
+        proxyErrorDialog?.dismiss()
+        proxyErrorDialog = null
         super.onDestroyView()
         webViewBinding = null
     }
@@ -190,9 +199,19 @@ class WebViewFragment : Fragment(), BackPressInterceptor, JellyfinWebChromeClien
         addJavascriptInterface(externalPlayer, "ExternalPlayer")
         addJavascriptInterface(mediaSegments, "MediaSegments")
 
-        loadUrl("${server.hostname.trimEnd('/')}/")
-        postDelayed(timeoutRunnable, Constants.INITIAL_CONNECTION_TIMEOUT)
-        postDelayed(showLoadingContainerRunnable, Constants.SHOW_PROGRESS_BAR_DELAY)
+        if (!homeProxy.configureWebView(androidx.core.content.ContextCompat.getMainExecutor(requireContext())) { accepted ->
+                if (webViewBinding?.webView !== this) return@configureWebView
+                if (!accepted) {
+                    showProxyError()
+                    return@configureWebView
+                }
+                loadUrl("${server.hostname.trimEnd('/')}/")
+                postDelayed(timeoutRunnable, Constants.INITIAL_CONNECTION_TIMEOUT)
+                postDelayed(showLoadingContainerRunnable, Constants.SHOW_PROGRESS_BAR_DELAY)
+            }
+        ) {
+            showProxyError(unsupportedWebView = true)
+        }
     }
 
     private fun showOutdatedWebViewDialog(webView: WebView) {
@@ -242,6 +261,10 @@ class WebViewFragment : Fragment(), BackPressInterceptor, JellyfinWebChromeClien
     }
 
     private fun onSelectServer(error: Boolean = false) = runOnUiThread {
+        if (homeProxy.enabled) {
+            showProxyError()
+            return@runOnUiThread
+        }
         val activity = activity
         if (activity != null && activity.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
             val extras = when {
@@ -257,6 +280,25 @@ class WebViewFragment : Fragment(), BackPressInterceptor, JellyfinWebChromeClien
     private fun handleError() {
         connected = false
         onSelectServer(error = true)
+    }
+
+    private fun showProxyError(unsupportedWebView: Boolean = false) {
+        val context = context ?: return
+        val binding = webViewBinding ?: return
+        if (proxyErrorDialog?.isShowing == true) return
+        binding.webView.removeCallbacks(timeoutRunnable)
+        binding.webView.removeCallbacks(showLoadingContainerRunnable)
+        binding.loadingContainer.isVisible = false
+        val dialog = AlertDialog.Builder(context).setTitle(R.string.home_proxy_unavailable)
+        if (unsupportedWebView) {
+            dialog.setMessage(R.string.home_proxy_update_webview)
+                .setPositiveButton(android.R.string.ok) { _, _ -> requireActivity().finish() }
+        } else {
+            dialog.setMessage(R.string.home_proxy_retry_message)
+                .setPositiveButton(R.string.home_proxy_retry) { _, _ -> binding.webView.initialize() }
+                .setNegativeButton(android.R.string.cancel, null)
+        }
+        proxyErrorDialog = dialog.show()
     }
 
     override fun onShowFileChooser(intent: Intent, filePathCallback: ValueCallback<Array<Uri>>) {

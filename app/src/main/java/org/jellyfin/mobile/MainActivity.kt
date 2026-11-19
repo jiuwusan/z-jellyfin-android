@@ -17,6 +17,8 @@ import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.core.content.pm.ShortcutInfoCompat
+import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.withStarted
@@ -26,6 +28,9 @@ import org.jellyfin.mobile.events.ActivityEventHandler
 import org.jellyfin.mobile.player.cast.Chromecast
 import org.jellyfin.mobile.player.cast.IChromecast
 import org.jellyfin.mobile.player.ui.PlayerFragment
+import org.jellyfin.mobile.proxy.HomeProxySettings
+import org.jellyfin.mobile.proxy.prompt
+import org.jellyfin.mobile.settings.HomeProxyFragment
 import org.jellyfin.mobile.setup.ConnectFragment
 import org.jellyfin.mobile.utils.AndroidVersion
 import org.jellyfin.mobile.utils.BackPressInterceptor
@@ -34,6 +39,7 @@ import org.jellyfin.mobile.utils.Constants
 import org.jellyfin.mobile.utils.PermissionRequestHelper
 import org.jellyfin.mobile.utils.SmartOrientationListener
 import org.jellyfin.mobile.utils.extensions.replaceFragment
+import org.jellyfin.mobile.utils.extensions.addFragment
 import org.jellyfin.mobile.utils.isWebViewSupported
 import org.jellyfin.mobile.webapp.RemotePlayerService
 import org.jellyfin.mobile.webapp.WebViewFragment
@@ -48,6 +54,9 @@ class MainActivity : AppCompatActivity() {
     val bluetoothPermissionHelper: BluetoothPermissionHelper = BluetoothPermissionHelper(this, get())
     val chromecast: IChromecast = Chromecast()
     private val permissionRequestHelper: PermissionRequestHelper by inject()
+    private val homeProxy: HomeProxySettings by inject()
+    private var playerServiceBound = false
+    private var openProxyOnResume = false
 
     var serviceBinder: RemotePlayerService.ServiceBinder? = null
         private set
@@ -103,6 +112,7 @@ class MainActivity : AppCompatActivity() {
         )
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+        readHomeProxyShortcut(intent)
 
         // Check WebView support
         if (!isWebViewSupported()) {
@@ -124,8 +134,24 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        // Bind player service
-        bindService(Intent(this, RemotePlayerService::class.java), serviceConnection, Service.BIND_AUTO_CREATE)
+        if (homeProxy.enabled && !homeProxy.readiness.value) {
+            homeProxy.prompt(this, onSaved = ::startApp, onCancel = ::finishAfterTransition)
+        } else {
+            startApp()
+        }
+    }
+
+    private fun startApp() {
+        playerServiceBound = bindService(Intent(this, RemotePlayerService::class.java), serviceConnection, Service.BIND_AUTO_CREATE)
+        if (homeProxy.enabled) {
+            ShortcutManagerCompat.pushDynamicShortcut(
+                this,
+                ShortcutInfoCompat.Builder(this, "home-proxy")
+                    .setShortLabel(getString(R.string.home_proxy_title))
+                    .setIntent(Intent(this, MainActivity::class.java).setAction(ACTION_HOME_PROXY))
+                    .build(),
+            )
+        }
 
         // Subscribe to activity events
         with(activityEventHandler) { subscribe() }
@@ -133,8 +159,13 @@ class MainActivity : AppCompatActivity() {
         // Load UI
         lifecycleScope.launch {
             mainViewModel.serverState.collectLatest { state ->
-                lifecycle.withStarted {
-                    handleServerState(state)
+                if (homeProxy.enabled && state != ServerState.Pending && state.server?.hostname != HomeProxySettings.SERVER) {
+                    mainViewModel.switchServer(HomeProxySettings.SERVER)
+                } else {
+                    lifecycle.withStarted {
+                        handleServerState(state)
+                        if (state is ServerState.Available) openHomeProxyShortcut()
+                    }
                 }
             }
         }
@@ -144,6 +175,32 @@ class MainActivity : AppCompatActivity() {
 
         // Setup Chromecast
         chromecast.initializePlugin(this)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        readHomeProxyShortcut(intent)
+    }
+
+    override fun onPostResume() {
+        super.onPostResume()
+        if (supportFragmentManager.fragments.any { it is WebViewFragment }) openHomeProxyShortcut()
+    }
+
+    private fun readHomeProxyShortcut(intent: Intent) {
+        if (homeProxy.enabled && intent.action == ACTION_HOME_PROXY) {
+            openProxyOnResume = true
+            intent.action = Intent.ACTION_MAIN
+        }
+    }
+
+    private fun openHomeProxyShortcut() {
+        if (!openProxyOnResume || supportFragmentManager.isStateSaved) return
+        openProxyOnResume = false
+        if (supportFragmentManager.findFragmentById(R.id.fragment_container) !is HomeProxyFragment) {
+            supportFragmentManager.addFragment<HomeProxyFragment>()
+        }
     }
 
     override fun onStart() {
@@ -206,8 +263,14 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
-        unbindService(serviceConnection)
-        chromecast.destroy()
+        if (playerServiceBound) {
+            unbindService(serviceConnection)
+            chromecast.destroy()
+        }
         super.onDestroy()
+    }
+
+    companion object {
+        private const val ACTION_HOME_PROXY = "org.jellyfin.mobile.action.HOME_PROXY_SETTINGS"
     }
 }

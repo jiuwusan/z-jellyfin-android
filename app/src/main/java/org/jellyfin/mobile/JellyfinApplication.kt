@@ -23,7 +23,7 @@ class JellyfinApplication : Application() {
         if (BuildConfig.DEBUG) {
             // Enable WebView debugging
             if (isWebViewSupported()) {
-                WebView.setWebContentsDebuggingEnabled(true)
+                WebView.setWebContentsDebuggingEnabled(!BuildConfig.HOME_PROXY_TRIAL)
             }
         }
 

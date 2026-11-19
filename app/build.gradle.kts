@@ -31,6 +31,7 @@ android {
     compileSdk = libs.versions.android.compileSdk.get().toInt()
 
     defaultConfig {
+        buildConfigField("boolean", "HOME_PROXY_TRIAL", "false")
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
         versionName = project.getVersionName()
@@ -72,6 +73,7 @@ android {
         getByName("debug") {
             applicationIdSuffix = ".debug"
             isDebuggable = true
+            buildConfigField("boolean", "HOME_PROXY_TRIAL", (findProperty("homeProxyTrial") == "true").toString())
         }
     }
 

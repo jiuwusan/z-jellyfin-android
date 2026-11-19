@@ -9,6 +9,7 @@ import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.datasource.ResolvingDataSource
 import androidx.media3.datasource.cache.Cache
 import androidx.media3.datasource.cache.CacheDataSource
@@ -23,6 +24,7 @@ import androidx.media3.extractor.DefaultExtractorsFactory
 import androidx.media3.extractor.ts.TsExtractor
 import androidx.work.WorkManager
 import coil3.ImageLoader
+import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import kotlinx.coroutines.channels.Channel
 import okhttp3.OkHttpClient
 import org.jellyfin.mobile.MainViewModel
@@ -40,6 +42,7 @@ import org.jellyfin.mobile.player.mediasegments.MediaSegmentRepository
 import org.jellyfin.mobile.player.qualityoptions.QualityOptionsProvider
 import org.jellyfin.mobile.player.source.MediaSourceResolver
 import org.jellyfin.mobile.player.ui.PlayerFragment
+import org.jellyfin.mobile.proxy.HomeProxySettings
 import org.jellyfin.mobile.setup.ConnectionHelper
 import org.jellyfin.mobile.utils.Constants
 import org.jellyfin.mobile.utils.PermissionRequestHelper
@@ -62,8 +65,17 @@ private const val TS_SEARCH_PACKETS = 1800
 
 val applicationModule = module {
     single { AppPreferences(androidApplication()) }
-    single { OkHttpClient() }
-    single { ImageLoader(androidApplication()) }
+    single { HomeProxySettings(androidApplication()) }
+    single { get<HomeProxySettings>().configureClient(OkHttpClient.Builder()).build() }
+    single {
+        if (!get<HomeProxySettings>().enabled) ImageLoader(androidApplication())
+        else {
+            val client: OkHttpClient = get()
+            ImageLoader.Builder(androidApplication())
+                .components { add(OkHttpNetworkFetcherFactory(callFactory = { client })) }
+                .build()
+        }
+    }
     single { PermissionRequestHelper() }
     single { RemoteVolumeProvider(get()) }
     single(named(PLAYER_EVENT_CHANNEL)) { Channel<PlayerEvent>() }
@@ -115,8 +127,11 @@ val applicationModule = module {
         val context: Context = get()
         val apiClient: ApiClient = get()
 
-        val baseDataSourceFactory = DefaultHttpDataSource.Factory().apply {
-            setUserAgent(Util.getUserAgent(context, Constants.APP_INFO_NAME))
+        val userAgent = Util.getUserAgent(context, Constants.APP_INFO_NAME)
+        val baseDataSourceFactory = if (get<HomeProxySettings>().enabled) {
+            OkHttpDataSource.Factory(get<OkHttpClient>()).setUserAgent(userAgent)
+        } else {
+            DefaultHttpDataSource.Factory().setUserAgent(userAgent)
         }
 
         val dataSourceFactory = DefaultDataSource.Factory(context, baseDataSourceFactory)

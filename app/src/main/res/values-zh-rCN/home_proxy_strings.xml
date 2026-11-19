@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="home_proxy_setup">设置家庭访问</string>
+    <string name="home_proxy_setup_message">设置访问家庭 Jellyfin 所用的 HTTP 代理。保存后，打开 App 会自动连接。</string>
+    <string name="home_proxy_title">代理</string>
+    <string name="home_proxy_keep_password_help">留空即可保留已保存的代理密码。</string>
+    <string name="home_proxy_settings_summary">修改 HTTP 代理地址和登录信息</string>
+    <string name="home_proxy_host">代理地址</string>
+    <string name="home_proxy_port">端口</string>
+    <string name="home_proxy_username">用户名</string>
+    <string name="home_proxy_password">代理密码</string>
+    <string name="home_proxy_password_required">请输入代理密码</string>
+    <string name="home_proxy_change_password">修改确认密码</string>
+    <string name="home_proxy_change_password_required">请输入修改确认密码</string>
+    <string name="home_proxy_change_password_incorrect">修改确认密码错误</string>
+    <string name="home_proxy_invalid_host">请输入域名或 IP 地址，无需填写协议或端口</string>
+    <string name="home_proxy_invalid_port">请输入 1 到 65535 之间的端口</string>
+    <string name="home_proxy_invalid_username">请输入不含冒号的用户名</string>
+    <string name="home_proxy_save_failed">这台手机无法保存代理设置</string>
+    <string name="home_proxy_save">保存</string>
+    <string name="home_proxy_saved">代理设置已保存</string>
+    <string name="home_proxy_back">返回</string>
+    <string name="home_proxy_unavailable">暂时无法连接 Jellyfin</string>
+    <string name="home_proxy_retry_message">请检查网络连接后重试。</string>
+    <string name="home_proxy_update_webview">请更新 Android System WebView 后重新打开 Jellyfin。</string>
+    <string name="home_proxy_retry">重试</string>
+</resources>
